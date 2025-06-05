@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='syslira_tools',
-    version='',
+    version='0.1',
     packages=['clients', 'helpers'],
     url='',
     license='',
