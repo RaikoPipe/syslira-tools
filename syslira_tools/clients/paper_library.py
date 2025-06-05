@@ -4,10 +4,10 @@ from typing import Any, Dict, List, Union, Optional
 import pandas as pd
 
 from const import UNION_COLUMNS, ITEMTYPE_MAP
-from src.clients.zotero_client import ZoteroClient
-from src.clients.openalex_client import OpenAlexClient
-from src.helpers.obj_util import getattr_or_empty_str
-from src.helpers.conversion import convert_inverted_index
+from syslira_tools.clients.zotero_client import ZoteroClient
+from syslira_tools.clients.openalex_client import OpenAlexClient
+from syslira_tools.helpers.obj_util import getattr_or_empty_str
+from syslira_tools.helpers.conversion import convert_inverted_index
 from loguru import logger
 from const import PROJECT_PATH
 

@@ -22,5 +22,4 @@ dependencies = [
         'pybliometrics',
         'loguru',
         'pandas'
-
 ]
