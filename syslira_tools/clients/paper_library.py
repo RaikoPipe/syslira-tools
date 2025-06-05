@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Union, Optional
 
 import pandas as pd
 
-from const import UNION_COLUMNS, ITEMTYPE_MAP
+from syslira_tools.clients.const import UNION_COLUMNS, ITEMTYPE_MAP
 from syslira_tools.clients.zotero_client import ZoteroClient
 from syslira_tools.clients.openalex_client import OpenAlexClient
 from syslira_tools.helpers.obj_util import getattr_or_empty_str
