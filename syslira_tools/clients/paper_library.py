@@ -9,7 +9,6 @@ from syslira_tools.clients.openalex_client import OpenAlexClient
 from syslira_tools.helpers.obj_util import getattr_or_empty_str
 from syslira_tools.helpers.conversion import convert_inverted_index
 from loguru import logger
-from const import PROJECT_PATH
 
 
 class PaperLibrary:

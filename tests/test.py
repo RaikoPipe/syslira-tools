@@ -5,7 +5,7 @@ import pandas as pd
 import code_agent_tools.manager as syslira_manager
 import code_agent_tools as syslira_analyst
 from code_agent_tools import common
-from const import PROJECT_PATH
+from syslira_tools.clients.const import PROJECT_PATH
 from code_agent_tools import _get_paper_library
 from lr_tools.helpers import convert_inverted_index
 import json

@@ -1,3 +1,5 @@
+import os
+
 CP_COLUMNS = {
     "title",
     "abstractNote",
@@ -72,3 +74,5 @@ IDENTIFIER_TYPES = ["DOI", "ISBN", "PMID", "ArXiv", "DBLP", "MAG", "CorpusId"]
 ITEMTYPE_MAP = {
 
 }
+
+PROJECT_PATH = os.path.dirname(os.path.abspath(__file__))
