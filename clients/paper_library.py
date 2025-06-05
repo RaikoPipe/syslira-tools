@@ -6,12 +6,12 @@ from typing import Any, Dict, List, Union, Optional
 
 import pandas as pd
 
-from lr_tools.const import UNION_COLUMNS, ITEMTYPE_MAP
-from lr_tools.clients.scopus_client import ScopusClient
-from lr_tools.clients.zotero_client import ZoteroClient
-from lr_tools.clients.openalex_client import OpenAlexClient
-from lr_tools.helpers.obj_util import getattr_or_empty_str
-from lr_tools.helpers.conversion import convert_inverted_index
+from const import UNION_COLUMNS, ITEMTYPE_MAP
+from clients.scopus_client import ScopusClient
+from clients.zotero_client import ZoteroClient
+from clients.openalex_client import OpenAlexClient
+from helpers.obj_util import getattr_or_empty_str
+from helpers.conversion import convert_inverted_index
 from loguru import logger
 from const import PROJECT_PATH
 
