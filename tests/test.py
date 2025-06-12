@@ -1,19 +1,40 @@
 from unittest import TestCase  #
-
+import os
 import pandas as pd
 
-import code_agent_tools.manager as syslira_manager
-import code_agent_tools as syslira_analyst
-from code_agent_tools import common
-from syslira_tools.clients.const import PROJECT_PATH
-from code_agent_tools import _get_paper_library
-from lr_tools.helpers import convert_inverted_index
+from syslira_tools import PaperLibrary, ZoteroClient, OpenAlexClient
+from const import PROJECT_PATH
+
 import json
 from loguru import logger
-from lr_tools.const import UNION_COLUMNS
+from const import UNION_COLUMNS
+from syslira_tools.helpers import convert_inverted_index
 
 with open(f"{PROJECT_PATH}/tests/example_papers.json") as f:
     example_papers = json.load(f)
+
+# get zotero library env variables
+zotero_api_key = os.environ.get("ZOTERO_API_KEY", None)
+zotero_library_id = os.environ.get("ZOTERO_LIBRARY_ID", None)
+zotero_collection_key = os.environ.get("ZOTERO_COLLECTION_KEY", None)
+zotero_library_type = os.environ.get("ZOTERO_LIBRARY_TYPE", "user")
+
+if not zotero_api_key:
+    zotero_api_key = input("Please enter your Zotero API key: ")
+if not zotero_library_id:
+    zotero_library_id = input("Please enter your Zotero library ID: ")
+while zotero_library_type not in ["user", "group"]:
+    zotero_library_type = input("Please enter your Zotero library type (user or group): ")
+    if zotero_library_type not in ["user", "group"]:
+        print("Invalid library type. Please enter 'user' or 'group'.")
+if not zotero_collection_key:
+    zotero_collection_key = input("Please enter your Zotero collection key (optional, press Enter to skip): ")
+    zotero_collection_key = zotero_collection_key if zotero_collection_key else None
+
+zotero_client = ZoteroClient()
+zotero_client.init()
+openalex_client = OpenAlexClient()
+paper_library = PaperLibrary(zotero_client, openalex_client)
 
 
 # class ScopusRetrievalTestCase(TestCase):
@@ -76,11 +97,10 @@ class HelpersTestCase(TestCase):
 class PaperLibraryTestCase(TestCase):
 
     def setUp(self):
-        self.paper_library = _get_paper_library()
+        self.paper_library = paper_library
 
     def test_01_add_paper_to_library(self):
         self.paper_library.papers_df = pd.DataFrame()
-        syslira_manager.init_zotero_client(library_type="user")
         self.paper_library.add_papers_to_library(
             papers=example_papers,
         )
@@ -88,15 +108,13 @@ class PaperLibraryTestCase(TestCase):
         self.assertTrue(True)
 
     def test_02_get_paper_text(self):
-        syslira_manager.init_zotero_client(library_type="user")
-        paper_text = syslira_analyst.get_paper_fulltext(
-            paper_index=example_papers[0]["id"]
+        paper_text = zotero_client.get_fulltext(
+            item_key=example_papers[0]["id"]
         )
         self.assertTrue(isinstance(paper_text, str))
         self.assertTrue(True)
 
     def test_03_get_paper_indices(self):
-        syslira_manager.init_zotero_client(library_type="user")
         paper_indices = syslira_manager.get_paper_indices()
 
         self.assertTrue(len(paper_indices) > 0)

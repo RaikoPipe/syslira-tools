@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Union, Optional
 
 import pandas as pd
 
-from syslira_tools.clients.const import UNION_COLUMNS, ITEMTYPE_MAP
+from const import UNION_COLUMNS, ITEMTYPE_MAP
 from syslira_tools.clients.zotero_client import ZoteroClient
 from syslira_tools.clients.openalex_client import OpenAlexClient
 from syslira_tools.helpers.obj_util import getattr_or_empty_str
@@ -166,7 +166,7 @@ class PaperLibrary:
             return f"Error searching for papers on OpenAlex: {e}"
 
     def add_papers_to_library(
-        self, papers: List[Any]
+            self, papers: List[Any]
     ) -> Union[str, tuple[List[Dict[str, Any]], str]]:
         """
         Add papers to the library.
@@ -177,27 +177,38 @@ class PaperLibrary:
         Returns:
             Result and status message.
         """
-
         papers_details = self._create_library_items(papers, source="openalex")
 
-        num_duplicates = 0
         num_added = 0
+        num_duplicates = 0
 
         if papers_details:
+            # Create DataFrame from new papers
             paper_details_df = pd.DataFrame(
-                papers_details
+                papers_details, index=[paper["id"] for paper in papers_details]
             )
-            papers_df_concat = pd.concat([self.papers_df, paper_details_df], ignore_index=True)
-            self.papers_df = papers_df_concat.drop_duplicates(subset="id", keep="last")
-            self.papers_df.set_index("id", inplace=True)
 
-            num_duplicates = len(papers_df_concat.index) - len(self.papers_df.index)
-            num_added = len(paper_details_df.index) - num_duplicates
+            # First deduplicate within the new papers themselves
+            paper_details_df = paper_details_df.drop_duplicates(subset=["title"])
+            paper_details_df = paper_details_df.drop_duplicates(subset=["DOI"])
+
+            # Combine with existing library
+            combined_df = pd.concat([self.papers_df, paper_details_df])
+
+            # Remove duplicates from combined dataset
+            # Use a single drop_duplicates with a list of columns
+            self.papers_df = combined_df.drop_duplicates(subset=["title", "DOI"], keep="last")
+
+            num_added = len(self.papers_df) - len(combined_df)
+            num_duplicates = len(self.papers_df) - num_added
 
         return (
             f"Added {num_added} papers from OpenAlex to the library; "
-            f"{num_duplicates} duplicates were found and updated. "
+            f"{num_duplicates} existing were found and updated. "
         )
+
+
+
 
     # def add_papers_by_doi(
     #     self, doi_list: List[str]
@@ -683,7 +694,7 @@ class PaperLibrary:
     #     return f"Updated {len(updated)} papers with OpenAlex metadata."
 
     # Rest of the class methods remain unchanged
-    def update_local_library_with_zotero(self) -> str:
+    def update_from_zotero(self) -> str:
         """
         Update the local library with papers from Zotero. Also retrieves full text if available.
 
@@ -729,7 +740,7 @@ class PaperLibrary:
 
         return f"Added {len(added)} papers from Zotero to local library. Updated {len(updated)} existing papers."
 
-    def update_zotero_library(
+    def update_zotero_from_library(
         self, update_existing: bool = False
     ) -> str:
         """
@@ -792,9 +803,14 @@ class PaperLibrary:
         self.zotero_client.init()
 
         # update local library
-        self.update_local_library_with_zotero()
+        local_update = self.update_from_Zotero()
 
-        return self.update_zotero_library(update_existing)
+        zotero_update = self.update_zotero_from_library(update_existing)
+
+        return (
+            f"Zotero -> Local library \n\n: {local_update} "
+            f"Local library -> Zotero \n\n: {zotero_update}"
+        )
 
     def _add_item_to_zotero(
         self, paper_id:str, paper: pd.Series, collection_key: str, collection_items: Optional[List[Dict]] = None, update_existing=False,
@@ -979,11 +995,15 @@ class PaperLibrary:
                 raise Exception("No PDF attachments found for item.")
 
             target_attachment = pdf_attachments[0]
-            result = self.zotero_client.get_fulltext(target_attachment["key"])
+            try:
+                return self.zotero_client.get_fulltext(target_attachment["key"])
+            except Exception:
+                raise Exception(
+                    f"Valid attachment with key {target_attachment['key']} was found, but no fulltext could be retrieved. A potential workaround is to re-retrieve the fulltext through the Zotero client UI."
+                )
         else:
             raise Exception("No attachments found for item.")
 
-        return result
 
     def get_paper_text(self, paper_id: str, text_type: str = "fulltext") -> str:
         """
