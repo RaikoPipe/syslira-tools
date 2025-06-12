@@ -741,8 +741,7 @@ class PaperLibrary:
                 updated.append(item)
         if added or updated:
             return self.update_library(added + updated)
-        # todo: change return string
-        return f"Added {len(added)} papers from Zotero to local library. Updated {len(updated)} existing papers."
+        return f"No papers found in Zotero collection {self.collection_key} to update the local library."
 
     def update_zotero_from_library(
         self, update_existing: bool = False
