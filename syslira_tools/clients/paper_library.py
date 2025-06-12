@@ -750,10 +750,12 @@ class PaperLibrary:
         error_titles = []
         errors = []
 
+        collection_items = self.zotero_client.get_collection_items(self.collection_key)
+
         for paper_id, paper in self.papers_df.iterrows():
             try:
                 result_status = self._add_item_to_zotero(
-                    paper_id, paper, self.collection_key, None, update_existing
+                    paper_id, paper, self.collection_key, collection_items, update_existing
                 )
                 if result_status == "added":
                     added_titles.append(paper.title)
@@ -792,38 +794,7 @@ class PaperLibrary:
         # update local library
         self.update_local_library_with_zotero()
 
-        added_titles = []
-        updated_titles = []
-        skipped_titles = []
-        error_titles = []
-        errors = []
-
-
-        collection_items = self.zotero_client.get_collection_items(self.collection_key)
-
-        for paper_id, paper in self.papers_df.iterrows():
-            try:
-                result_status = self._add_item_to_zotero(
-                    paper_id, paper, self.collection_key, collection_items, update_existing
-                )
-                if result_status == "added":
-                    added_titles.append(paper.title)
-                elif result_status == "updated":
-                    updated_titles.append(paper.title)
-                else:
-                    skipped_titles.append(paper.title)
-
-            except Exception as e:
-                logger.warning(f"Error adding paper {paper['title']} to Zotero: {e}")
-                error_titles.append(paper.title)
-                errors.append(str(e))
-
-        return (
-            f"Added {len(added_titles)} papers to Zotero library. "
-            f"Updated {len(updated_titles)} existing papers. "
-            f"Skipped {len(skipped_titles)} papers. "
-            f"{len(error_titles)} errors occurred. "
-        )
+        return self.update_zotero_library(update_existing)
 
     def _add_item_to_zotero(
         self, paper_id:str, paper: pd.Series, collection_key: str, collection_items: Optional[List[Dict]] = None, update_existing=False,
