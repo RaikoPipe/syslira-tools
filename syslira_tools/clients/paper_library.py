@@ -167,7 +167,7 @@ class PaperLibrary:
 
     def add_papers_to_library(
             self, papers: List[Any]
-    ) -> Union[str, tuple[List[Dict[str, Any]], str]]:
+    ) -> str:
         """
         Add papers to the library.
 
@@ -177,38 +177,44 @@ class PaperLibrary:
         Returns:
             Result and status message.
         """
-        papers_details = self._create_library_items(papers, source="openalex")
 
-        num_added = 0
-        num_duplicates = 0
+        if papers:
+            papers_details = self._create_library_items(papers, source="openalex")
+            return self.update_library(papers_details)
+        else:
+            raise ValueError("No papers provided to add to the library.")
 
-        if papers_details:
-            # Create DataFrame from new papers
-            paper_details_df = pd.DataFrame(
-                papers_details, index=[paper["id"] for paper in papers_details]
-            )
 
-            # First deduplicate within the new papers themselves
-            paper_details_df = paper_details_df.drop_duplicates(subset=["title"])
-            paper_details_df = paper_details_df.drop_duplicates(subset=["DOI"])
+    def update_library(self, papers: List[Any]) -> str:
+        # Create DataFrame from new papers
+        paper_details_df = pd.DataFrame(
+            papers, index=[paper["id"] for paper in papers]
+        )
 
-            # Combine with existing library
-            combined_df = pd.concat([self.papers_df, paper_details_df])
+        # Deduplication step (more efficient than two separate calls)
+        paper_details_df = paper_details_df.drop_duplicates(subset=["title"])
+        paper_details_df = paper_details_df.drop_duplicates(subset=["DOI"])
 
-            # Remove duplicates from combined dataset
-            # Use a single drop_duplicates with a list of columns
-            self.papers_df = combined_df.drop_duplicates(subset=["title", "DOI"], keep="last")
+        # Get initial counts before merge
+        initial_count = len(self.papers_df)
+        new_papers_count = len(paper_details_df)
 
-            num_added = len(self.papers_df) - len(combined_df)
-            num_duplicates = len(self.papers_df) - num_added
+        # Combine and deduplicate in one step
+        combined_df = pd.concat([self.papers_df, paper_details_df]).drop_duplicates(
+            subset=["title", "DOI"], keep="last"
+        )
+
+        # Calculate metrics
+        final_count = len(combined_df)
+        num_added = final_count - initial_count
+        num_duplicates = new_papers_count - num_added
+
+        self.papers_df = combined_df
 
         return (
             f"Added {num_added} papers from OpenAlex to the library; "
-            f"{num_duplicates} existing were found and updated. "
+            f"{num_duplicates} existing were found and updated."
         )
-
-
-
 
     # def add_papers_by_doi(
     #     self, doi_list: List[str]
@@ -734,10 +740,8 @@ class PaperLibrary:
                 item["data"]["id"] = paper.index[0]  # use existing id
                 updated.append(item)
         if added or updated:
-            items = [item["data"] for item in added + updated]
-            update_df = pd.DataFrame(items, columns=self.columns, index=[item["id"] for item in items])
-            self.papers_df.update(update_df, overwrite=True)
-
+            return self.update_library(added + updated)
+        # todo: change return string
         return f"Added {len(added)} papers from Zotero to local library. Updated {len(updated)} existing papers."
 
     def update_zotero_from_library(

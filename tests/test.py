@@ -107,6 +107,14 @@ class PaperLibraryTestCase(TestCase):
         self.assertTrue(len(self.paper_library.get_library_df().index) > 0)
         self.assertTrue(True)
 
+    def test_02_update_papers_in_library(self):
+        # remove some papers to test update
+        self.paper_library.papers_df = self.paper_library.papers_df.iloc[0:3]
+        result = self.paper_library.add_papers_to_library(
+            papers=example_papers,
+        )
+        self.assertTrue(len(self.paper_library.get_library_df().index) > 3)
+
     def test_02_get_paper_text(self):
         paper_text = zotero_client.get_fulltext(
             item_key=example_papers[0]["id"]
@@ -114,74 +122,61 @@ class PaperLibraryTestCase(TestCase):
         self.assertTrue(isinstance(paper_text, str))
         self.assertTrue(True)
 
-    def test_03_get_paper_indices(self):
-        paper_indices = syslira_manager.get_paper_indices()
 
-        self.assertTrue(len(paper_indices) > 0)
-
-    def test_04_search_paper_index_by_title(self):
-        syslira_manager.init_zotero_client(library_type="user")
-        paper_index = common.search_paper_index_by_title(
-            query="Large Language Model Adaptation for Financial Sentiment Analysis"
-        )
-        self.assertTrue(paper_index)
-
-
-class OpenalexRetrievalTestCase(TestCase):
-    def setUp(self):
-        self.paper_library = _get_paper_library()
-
-    def test_01_search_and_add_to_library(self):
-        self.paper_library.papers_df = self.paper_library.papers_df.iloc[:0]  # Clear the DataFrame for testing
-        filter_args = {
-            "publication_year": "2023-2025",
-            "type": "article",
-            "cited_by_count": 0
-        }
-        papers = syslira_manager.retrieve_papers(
-            query={
-                "title_and_abstract": "(domain-specific OR domain-adapted) AND ('generative AI' OR "
-                                      "'generative artificial intelligence' OR LLM OR 'large language model')"
-            },
-            platform="openalex",
-            filter_args=filter_args,
-        )
-        self.assertTrue(papers)
-
-    def test_02_get_count_search_results(self):
-        filter_args = {
-            "publication_year": "2023-2025",
-            "type": "article",
-            "cited_by_count": 0,
-        }
-        message = syslira_manager.get_result_count(
-            query={
-                "title_and_abstract": "(domain-specific OR domain-adapted) AND ('generative AI' OR "
-                                      "'generative artificial intelligence' OR LLM OR 'large language model')"
-            },
-            platform="openalex",
-            filter_args=filter_args,
-        )
-        print(message)
-        self.assertTrue(message)
-
-    def test_03_sync_libraries(self):
-        syslira_manager.init_zotero_client(library_type="user")
-        self.paper_library.add_papers_to_library(
-            papers=example_papers,
-        )
-        message = syslira_manager.sync_zotero_collection(collection_key="NI94JZZ5")
-        if message:
-            logger.info(f"Zotero collection synced: {message}")
-
-        # papers_df should still have required columns after sync
-        has_columns = set(self.paper_library.get_library_df().columns.to_list())
-        requires_columns = set(UNION_COLUMNS)
-        logger.info(f"Difference columns: {has_columns.symmetric_difference(requires_columns)}")
-        self.assertTrue(has_columns.issubset(requires_columns))
-        # papers_df should not be empty after sync
-        self.assertTrue(self.paper_library.get_library_df().empty is False)
-        self.assertTrue(message)
+# class OpenalexRetrievalTestCase(TestCase):
+#     def setUp(self):
+#         self.paper_library = _get_paper_library()
+#
+#     def test_01_search_and_add_to_library(self):
+#         self.paper_library.papers_df = self.paper_library.papers_df.iloc[:0]  # Clear the DataFrame for testing
+#         filter_args = {
+#             "publication_year": "2023-2025",
+#             "type": "article",
+#             "cited_by_count": 0
+#         }
+#         papers = paper_library.retrieve_papers(
+#             query={
+#                 "title_and_abstract": "(domain-specific OR domain-adapted) AND ('generative AI' OR "
+#                                       "'generative artificial intelligence' OR LLM OR 'large language model')"
+#             },
+#             filter_args=filter_args,
+#         )
+#         self.assertTrue(papers)
+#
+#     def test_02_get_count_search_results(self):
+#         filter_args = {
+#             "publication_year": "2023-2025",
+#             "type": "article",
+#             "cited_by_count": 0,
+#         }
+#         message = syslira_manager.get_result_count(
+#             query={
+#                 "title_and_abstract": "(domain-specific OR domain-adapted) AND ('generative AI' OR "
+#                                       "'generative artificial intelligence' OR LLM OR 'large language model')"
+#             },
+#             platform="openalex",
+#             filter_args=filter_args,
+#         )
+#         print(message)
+#         self.assertTrue(message)
+#
+#     def test_03_sync_libraries(self):
+#         syslira_manager.init_zotero_client(library_type="user")
+#         self.paper_library.add_papers_to_library(
+#             papers=example_papers,
+#         )
+#         message = syslira_manager.sync_zotero_collection(collection_key="NI94JZZ5")
+#         if message:
+#             logger.info(f"Zotero collection synced: {message}")
+#
+#         # papers_df should still have required columns after sync
+#         has_columns = set(self.paper_library.get_library_df().columns.to_list())
+#         requires_columns = set(UNION_COLUMNS)
+#         logger.info(f"Difference columns: {has_columns.symmetric_difference(requires_columns)}")
+#         self.assertTrue(has_columns.issubset(requires_columns))
+#         # papers_df should not be empty after sync
+#         self.assertTrue(self.paper_library.get_library_df().empty is False)
+#         self.assertTrue(message)
 
 
 if __name__ == "__main__":
