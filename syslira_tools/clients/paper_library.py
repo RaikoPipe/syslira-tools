@@ -806,7 +806,7 @@ class PaperLibrary:
         self.zotero_client.init()
 
         # update local library
-        local_update = self.update_from_Zotero()
+        local_update = self.update_from_zotero()
 
         zotero_update = self.update_zotero_from_library(update_existing)
 
