@@ -3,11 +3,9 @@ import os
 import pandas as pd
 
 from syslira_tools import PaperLibrary, ZoteroClient, OpenAlexClient
-from const import PROJECT_PATH
+from syslira_tools.const import PROJECT_PATH
 
 import json
-from loguru import logger
-from const import UNION_COLUMNS
 from syslira_tools.helpers import convert_inverted_index
 
 with open(f"{PROJECT_PATH}/tests/example_papers.json") as f:
