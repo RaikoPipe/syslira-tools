@@ -80,9 +80,9 @@ class ZoteroClient:
         """Create new items in Zotero."""
         return self.client.create_items(templates)
 
-    def update_item(self, item_key: str, template: Dict):
+    def update_item(self, template: Dict):
         """Update an existing item in Zotero."""
-        return self.client.update_item(item_key, template)
+        return self.client.update_item(template)
 
     def item_template(self, itemtype: str):
         """Get an item template from Zotero."""

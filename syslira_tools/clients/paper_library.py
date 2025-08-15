@@ -187,6 +187,7 @@ class PaperLibrary:
 
     def update_library(self, papers: List[Any]) -> str:
         # Create DataFrame from new papers
+        papers = [paper["data"] for paper in papers if "data" in paper]
         paper_details_df = pd.DataFrame(
             papers, index=[paper["id"] for paper in papers]
         )
@@ -197,7 +198,7 @@ class PaperLibrary:
 
         # Get initial counts before merge
         initial_count = len(self.papers_df)
-        new_papers_count = len(paper_details_df)
+        deduplicated_new_count = len(paper_details_df)
 
         # Combine and deduplicate in one step
         combined_df = pd.concat([self.papers_df, paper_details_df]).drop_duplicates(
@@ -207,7 +208,8 @@ class PaperLibrary:
         # Calculate metrics
         final_count = len(combined_df)
         num_added = final_count - initial_count
-        num_duplicates = new_papers_count - num_added
+        # Calculate duplicates as papers that existed in the original library
+        num_duplicates = deduplicated_new_count - num_added
 
         self.papers_df = combined_df
 
@@ -858,7 +860,7 @@ class PaperLibrary:
 
         if existing_item and update_existing:
             template = self._create_zotero_item(paper_id, collection_key, paper)
-            result = self.zotero_client.update_item(existing_item["key"], template)
+            result = self.zotero_client.update_item(template)
             return "updated"
         elif existing_item:
             return "skipped"
