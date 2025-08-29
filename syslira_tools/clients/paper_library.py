@@ -702,9 +702,11 @@ class PaperLibrary:
     #     return f"Updated {len(updated)} papers with OpenAlex metadata."
 
     # Rest of the class methods remain unchanged
-    def update_from_zotero(self) -> str:
+    def update_from_zotero(self, get_fulltext:bool=False) -> str:
         """
         Update the local library with papers from Zotero. Also retrieves full text if available.
+        Args:
+            get_fulltext: Whether to retrieve full text from Zotero items.
 
         Returns:
             str: Status message.
@@ -728,11 +730,12 @@ class PaperLibrary:
             )  # use zotero key if id was never given
 
             # download full text
-            try:
-                fulltext = self.retrieve_fulltext_from_zotero_item(item["key"])
-                item["data"]["fulltext"] = fulltext["content"]
-            except Exception as e:
-                logger.debug(f"Could not retrieve fulltext for item {item['key']}: {e}")
+            if get_fulltext:
+                try:
+                    get_fulltext = self.retrieve_fulltext_from_zotero_item(item["key"])
+                    item["data"]["fulltext"] = get_fulltext["content"]
+                except Exception as e:
+                    logger.debug(f"Could not retrieve fulltext for item {item['key']}: {e}")
 
             if item["data"]["title"] not in self.papers_df["title"].values:
                 added.append(item)
@@ -753,6 +756,7 @@ class PaperLibrary:
 
         Args:
             update_existing: Whether to update existing items in Zotero.
+            fulltext: Whether to retrieve full text from Zotero items.
 
         Returns:
             str: Status message.
@@ -793,13 +797,14 @@ class PaperLibrary:
         )
 
     def sync_zotero_collection(
-        self, update_existing: bool = False
+        self, update_existing: bool = False, get_fulltext: bool = False
     ) -> str:
         """
         Synchronize both the local library and Zotero collection.
 
         Args:
             update_existing: Whether to update existing items in Zotero.
+            get_fulltext: Whether to retrieve full text from Zotero items.
 
         Returns:
             str: Status message.
@@ -808,7 +813,7 @@ class PaperLibrary:
         self.zotero_client.init()
 
         # update local library
-        local_update = self.update_from_zotero()
+        local_update = self.update_from_zotero(get_fulltext)
 
         zotero_update = self.update_zotero_from_library(update_existing)
 
