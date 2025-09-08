@@ -184,13 +184,18 @@ class PaperLibrary:
         else:
             raise ValueError("No papers provided to add to the library.")
 
-    def deduplicate_titles(self, papers_df) -> pd.DataFrame:
-        papers_df_ex_title_duplicates = papers_df.drop_duplicates(subset=["title"], keep=False)
-        title_duplicates = papers_df - papers_df_ex_title_duplicates
+    def find_duplicates_to_drop(self, papers_df) -> pd.DataFrame:
+        # Find rows that have duplicate titles
+        title_duplicates = papers_df[papers_df.duplicated(subset=["title"], keep=False)]
+
+        if title_duplicates.empty:
+            # No duplicates found, return empty dataframe
+            return pd.DataFrame(columns=papers_df.columns)
 
         # handling logic for title duplicates
         grouped = title_duplicates.groupby('title')
-        to_keep = pd.DataFrame(columns=self.columns, dtype=str)
+        to_drop_df = pd.DataFrame(columns=self.columns, dtype=str)
+
         for title, group in grouped:
             # prioritize journal articles over preprint and conference papers
             if any(group['itemType'] == 'journalArticle'):
@@ -199,42 +204,46 @@ class PaperLibrary:
                 to_keep = group[group['itemType'] == 'conferencePaper'].iloc[0]
             else:
                 to_keep = group.iloc[0]
-        return papers_df_ex_title_duplicates + to_keep
 
-    def update_library(self, papers: List[Any], deduplicate:bool=False) -> str:
+            # Get all rows in this group EXCEPT the one we want to keep
+            to_drop_from_group = group[group.index != to_keep.name]
+            to_drop_df = pd.concat([to_drop_df, to_drop_from_group])
+
+        return to_drop_df
+
+    def update_library(self, papers: List[Any], deduplicate:bool=True) -> str:
         # Create DataFrame from new papers
         papers = [paper["data"] for paper in papers if "data" in paper]
         papers_df = pd.DataFrame(
             papers, index=[paper["id"] for paper in papers]
         )
 
-        if deduplicate:
-            # Deduplicate based on title
-            papers_df = self.deduplicate_titles(papers_df)
-            # deduplicate DOI if existing, keep if DOI is empty
-            papers_df = papers_df[(~papers_df.duplicated(subset="DOI")) | (papers_df["DOI"].isin(["", None]))]
-
         # Get initial counts before merge
         initial_count = len(self.papers_df)
-        deduplicated_new_count = len(papers_df)
 
-        # Combine and deduplicate in one step
-        combined_df = pd.concat([self.papers_df, papers_df]).drop_duplicates(
-            subset=["title", "DOI"], keep="last"
-        )
+        # Combine with existing library
+        combined_df = pd.concat([self.papers_df, papers_df])
+
+        if deduplicate:
+            title_duplicates = self.find_duplicates_to_drop(combined_df)
+            # get DOI duplicates (ignore empty DOIs)
+            doi_duplicates = combined_df[combined_df.duplicated(subset=["DOI"], keep=False) & combined_df["DOI"].apply(lambda x: x not in ["", None])]
+
+            # remove duplicates from combined_df
+            duplicates_to_drop = pd.concat([title_duplicates, doi_duplicates]).drop_duplicates()
+            combined_df = combined_df.drop(duplicates_to_drop.index)
 
         # Calculate metrics
         final_count = len(combined_df)
         num_added = final_count - initial_count
-        # Calculate duplicates as papers that existed in the original library
-        num_duplicates = deduplicated_new_count - num_added
 
         self.papers_df = combined_df
 
-        return (
-            f"Added {num_added} papers from OpenAlex to the library; "
-            f"{num_duplicates} existing were found and updated."
-        )
+        result = f"Added {num_added} papers from OpenAlex to the library; "
+        if deduplicate:
+            result += f"{len(duplicates_to_drop)} duplicates were found and removed."
+
+        return result
 
     # def add_papers_by_doi(
     #     self, doi_list: List[str]
