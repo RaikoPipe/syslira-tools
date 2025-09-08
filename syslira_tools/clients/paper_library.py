@@ -227,10 +227,10 @@ class PaperLibrary:
         if deduplicate:
             title_duplicates = self.find_duplicates_to_drop(combined_df)
             # get DOI duplicates (ignore empty DOIs)
-            doi_duplicates = combined_df[combined_df.duplicated(subset=["DOI"], keep=False) & combined_df["DOI"].apply(lambda x: x not in ["", None])]
+            doi_duplicates = combined_df[combined_df.duplicated(subset=["DOI"], keep=False) & combined_df["DOI"].notna() & (combined_df["DOI"] != "")]
 
             # remove duplicates from combined_df
-            duplicates_to_drop = pd.concat([title_duplicates, doi_duplicates]).drop_duplicates()
+            duplicates_to_drop = pd.concat([title_duplicates, doi_duplicates]).drop_duplicates(subset="id")
             combined_df = combined_df.drop(duplicates_to_drop.index)
 
         # Calculate metrics
