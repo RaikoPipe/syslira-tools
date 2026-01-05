@@ -21,5 +21,6 @@ dependencies = [
         'pyzotero',
         'pybliometrics',
         'loguru',
-        'pandas'
+        'pandas',
+        'pymupdf4llm',
 ]
