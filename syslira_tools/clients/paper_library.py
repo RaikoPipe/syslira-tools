@@ -9,6 +9,8 @@ from syslira_tools.clients.openalex_client import OpenAlexClient
 from syslira_tools.helpers.obj_util import getattr_or_empty_str
 from syslira_tools.helpers.conversion import convert_inverted_index
 from loguru import logger
+import pymupdf4llm
+import os
 
 
 class PaperLibrary:
@@ -211,12 +213,17 @@ class PaperLibrary:
 
         return to_drop_df
 
-    def update_library(self, papers: List[Any], deduplicate:bool=True) -> str:
-        # Create DataFrame from new papers
-        papers = [paper["data"] for paper in papers if "data" in paper]
-        papers_df = pd.DataFrame(
-            papers, index=[paper["id"] for paper in papers]
-        )
+    def update_library(self, papers: List[Any] | pd.DataFrame, deduplicate:bool=True) -> str:
+        if isinstance(papers, List):
+            # Create DataFrame from new papers
+            papers = [paper["data"] for paper in papers if "data" in paper]
+            papers_df = pd.DataFrame(
+                papers, index=[paper["id"] for paper in papers]
+            )
+        elif isinstance(papers, pd.DataFrame):
+            papers_df = papers
+        else:
+            raise ValueError(f"Unknown type {type(papers)}")
 
         # Get initial counts before merge
         initial_count = len(self.papers_df)
@@ -226,12 +233,13 @@ class PaperLibrary:
 
         if deduplicate:
             title_duplicates = self.find_duplicates_to_drop(combined_df)
+            combined_df_cleaned = combined_df.drop(title_duplicates.index)
             # get DOI duplicates (ignore empty DOIs)
-            doi_duplicates = combined_df[combined_df.duplicated(subset=["DOI"], keep=False) & combined_df["DOI"].notna() & (combined_df["DOI"] != "")]
-
+            doi_duplicates = combined_df_cleaned[combined_df_cleaned.duplicated(subset=["DOI"], keep=False) & combined_df_cleaned["DOI"].notna() & (combined_df_cleaned["DOI"] != "")]
+            combined_df_cleaned = combined_df_cleaned.drop(doi_duplicates.index)
             # remove duplicates from combined_df
-            duplicates_to_drop = pd.concat([title_duplicates, doi_duplicates]).drop_duplicates(subset="id")
-            combined_df = combined_df.drop(duplicates_to_drop.index)
+            duplicates_dropped = len(combined_df) - len(combined_df_cleaned)
+            combined_df = combined_df_cleaned
 
         # Calculate metrics
         final_count = len(combined_df)
@@ -239,9 +247,9 @@ class PaperLibrary:
 
         self.papers_df = combined_df
 
-        result = f"Added {num_added} papers from OpenAlex to the library; "
+        result = f"Added {num_added} new papers from OpenAlex to the library (total count: {final_count}); "
         if deduplicate:
-            result += f"{len(duplicates_to_drop)} duplicates were found and removed."
+            result += f"{duplicates_dropped} duplicates were found and removed."
 
         return result
 
@@ -729,20 +737,24 @@ class PaperLibrary:
     #     return f"Updated {len(updated)} papers with OpenAlex metadata."
 
     # Rest of the class methods remain unchanged
-    def update_from_zotero(self, get_fulltext:bool=False, deduplicate:bool=False) -> str:
+    def update_from_zotero(self, get_fulltext="parsed", deduplicate:bool=False, collection_key:str= "") -> str:
         """
         Update the local library with papers from Zotero. Also retrieves full text if available.
         Args:
-            get_fulltext: Whether to retrieve full text from Zotero items.
+            get_fulltext: Options for full text retrieval: 'parsed', 'raw', or None.
 
         Returns:
             str: Status message.
         """
+        if collection_key == "":
+            collection_key = self.collection_key
+        if not collection_key:
+            raise ValueError("No collection key provided for Zotero.")
         # Initialize Zotero if not already
         self.zotero_client.init()
 
         zotero_items = self.zotero_client.get_all_items(
-            collection_key=self.collection_key
+            collection_key=collection_key
         )
         added = []
         updated = []
@@ -759,8 +771,13 @@ class PaperLibrary:
             # download full text
             if get_fulltext:
                 try:
-                    get_fulltext = self.retrieve_fulltext_from_zotero_item(item["key"])
-                    item["data"]["fulltext"] = get_fulltext["content"]
+                    if get_fulltext == "parsed":
+                        retrieval_fn = self.retrieve_parsed_fulltext_from_zotero_item
+                    else:
+                        retrieval_fn = self.retrieve_fulltext_from_zotero_item
+                    fulltext = retrieval_fn(item["key"])
+                    item["data"]["fulltext"] = fulltext["content"]
+
                 except Exception as e:
                     logger.debug(f"Could not retrieve fulltext for item {item['key']}: {e}")
 
@@ -783,7 +800,6 @@ class PaperLibrary:
 
         Args:
             update_existing: Whether to update existing items in Zotero.
-            fulltext: Whether to retrieve full text from Zotero items.
 
         Returns:
             str: Status message.
@@ -995,7 +1011,7 @@ class PaperLibrary:
         for paper_id, paper in self.papers_df.iterrows():
             if paper["zoteroKey"]:
                 try:
-                    fulltext = self.retrieve_fulltext_from_zotero_item(paper["zoteroKey"])
+                    fulltext = self.retrieve_parsed_fulltext_from_zotero_item(paper["zoteroKey"])
                     self.papers_fulltext_df.at[paper.index, "fulltext"] = fulltext
                     downloaded.append(paper["title"])
                 except Exception as e:
@@ -1040,6 +1056,70 @@ class PaperLibrary:
                 )
         else:
             raise Exception("No attachments found for item.")
+
+    def retrieve_parsed_fulltext_from_zotero_item(self, item_key: str) -> Dict:
+        """
+        Retrieve full-text content for a Zotero item using PyMuPDF4LLM parsing.
+        Will raise exception if no attachment was found.
+
+        Args:
+            item_key: The key of the Zotero item.
+
+        Returns:
+            dict: Full-text content and metadata with hierarchical structure.
+        """
+        attachments = self.get_attachment_info(item_key).get("attachments")
+
+        if not attachments:
+            raise Exception("No attachments found for item.")
+
+        # Get first attachment that is a PDF
+        pdf_attachments = [
+            x for x in attachments if x.get("contentType") == "application/pdf"
+        ]
+
+        if not pdf_attachments:
+            raise Exception("No PDF attachments found for item.")
+
+        target_attachment = pdf_attachments[0]
+        attachment_key = target_attachment["key"]
+
+        try:
+            # Download PDF content
+            pdf_content = self.zotero_client.file(attachment_key)
+
+            # Save temporarily
+            temp_path = f"/tmp/{attachment_key}.pdf"
+            with open(temp_path, 'wb') as f:
+                f.write(pdf_content)
+
+            # Parse with PyMuPDF4LLM
+            md_text = pymupdf4llm.to_markdown(temp_path)
+
+            # Clean up temp file
+            os.remove(temp_path)
+
+            return {
+                "content": md_text,
+                "indexedPages": None,  # PyMuPDF4LLM processes all pages
+                "totalPages": None,    # Can extract if needed
+            }
+
+        except Exception as e:
+            raise Exception(
+                f"Valid attachment with key {attachment_key} was found, but parsing failed: {str(e)}"
+            )
+
+    def retrieve_pdf_from_zotero_item(self, item_key: str) -> bytes:
+        """
+        Retrieve PDF content for a Zotero item.
+
+        Args:
+            item_key: The key of the Zotero item.
+        Returns:
+            bytes: PDF content.
+        """
+
 
 
     def get_paper_text(self, paper_id: str, text_type: str = "fulltext") -> str:
