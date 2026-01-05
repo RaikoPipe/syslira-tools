@@ -108,6 +108,6 @@ class ZoteroClient:
         """Create a new collection in Zotero."""
         return self.client.create_collection(collections)
 
-    def get_file(self, item_key: str, file_name: str) -> bytes:
+    def get_file(self, item_key: str) -> bytes:
         """Get a file attachment from a Zotero item."""
         return self.client.file(item_key)
