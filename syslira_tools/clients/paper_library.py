@@ -1086,7 +1086,7 @@ class PaperLibrary:
 
         try:
             # Download PDF content
-            pdf_content = self.zotero_client.file(attachment_key)
+            pdf_content = self.zotero_client.get_file(attachment_key)
 
             # Save temporarily
             temp_path = f"/tmp/{attachment_key}.pdf"
