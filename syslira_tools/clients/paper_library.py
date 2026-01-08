@@ -9,6 +9,7 @@ from syslira_tools.clients.openalex_client import OpenAlexClient
 from syslira_tools.helpers.obj_util import getattr_or_empty_str
 from syslira_tools.helpers.conversion import convert_inverted_index
 from loguru import logger
+import pymupdf.layout
 import pymupdf4llm
 import os
 
