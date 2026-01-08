@@ -1094,7 +1094,7 @@ class PaperLibrary:
                 f.write(pdf_content)
 
             # Parse with PyMuPDF4LLM
-            md_text = pymupdf4llm.to_markdown(temp_path)
+            md_text = pymupdf4llm.to_markdown(temp_path, header=False, footer=False)
 
             # Clean up temp file
             os.remove(temp_path)
