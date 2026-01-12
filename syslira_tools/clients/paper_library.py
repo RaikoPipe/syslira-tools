@@ -18,11 +18,11 @@ class PaperLibrary:
     """Manager for the paper library with local storage, Zotero and OpenAlex integration."""
 
     def __init__(
-        self,
-        #scopus_client: ScopusClient,
-        zotero_client: ZoteroClient,
-        openalex_client: OpenAlexClient,  # Add OpenAlex client
-        collection_key: str = None,
+            self,
+            #scopus_client: ScopusClient,
+            zotero_client: ZoteroClient,
+            openalex_client: OpenAlexClient,  # Add OpenAlex client
+            collection_key: str = None,
     ):
         """
         Initialize the paper library manager.
@@ -112,7 +112,7 @@ class PaperLibrary:
     #     )
 
     def get_count_search_results(
-        self, query: dict, limit: int = 25, filter_args: Optional[dict] = None
+            self, query: dict, limit: int = 25, filter_args: Optional[dict] = None
     ) -> str:
         """
         Search openalex for papers and return the number of results.
@@ -142,7 +142,7 @@ class PaperLibrary:
         return f"Number of results for query '{query}': {count}"
 
     def retrieve_papers(
-        self, query: dict, limit: int = 25, filter_args: Optional[dict] = None
+            self, query: dict, limit: int = 25, filter_args: Optional[dict] = None
     ) -> str | list[dict[str, Any]]:
         """
         Search for papers on OpenAlex and return.
@@ -468,7 +468,7 @@ class PaperLibrary:
     #     )
 
     def _create_library_items(
-        self, papers: List[Any], source: str = "scopus"
+            self, papers: List[Any], source: str = "scopus"
     ) -> List[Dict[str, Any]]:
         """
         Extract details from the list of papers.
@@ -591,7 +591,7 @@ class PaperLibrary:
         return papers_details
 
     def _extract_openalex_papers(
-        self, papers: List[Dict[str, Any]]
+            self, papers: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
         Extract details from the list of OpenAlex papers.
@@ -771,16 +771,12 @@ class PaperLibrary:
 
             # download full text
             if get_fulltext:
-                try:
-                    if get_fulltext == "parsed":
-                        retrieval_fn = self.retrieve_parsed_fulltext_from_zotero_item
-                    else:
-                        retrieval_fn = self.retrieve_fulltext_from_zotero_item
-                    fulltext = retrieval_fn(item["key"])
-                    item["data"]["fulltext"] = fulltext["content"]
-
-                except Exception as e:
-                    logger.debug(f"Could not retrieve fulltext for item {item['key']}: {e}")
+                if get_fulltext == "parsed":
+                    retrieval_fn = self.retrieve_parsed_fulltext_from_zotero_item
+                else:
+                    retrieval_fn = self.retrieve_fulltext_from_zotero_item
+                fulltext = retrieval_fn(item["key"])
+                item["data"]["fulltext"] = fulltext["content"]
 
             if item["data"]["title"] not in self.papers_df["title"].values:
                 added.append(item)
@@ -794,7 +790,7 @@ class PaperLibrary:
         return f"No papers found in Zotero collection {self.collection_key} to update the local library."
 
     def update_zotero_from_library(
-        self, update_existing: bool = False
+            self, update_existing: bool = False
     ) -> str:
         """
         Update the Zotero library with the papers in the local library.
@@ -841,7 +837,7 @@ class PaperLibrary:
         )
 
     def sync_zotero_collection(
-        self, update_existing: bool = False, get_fulltext: bool = False
+            self, update_existing: bool = False, get_fulltext: bool = False
     ) -> str:
         """
         Synchronize both the local library and Zotero collection.
@@ -867,7 +863,7 @@ class PaperLibrary:
         )
 
     def _add_item_to_zotero(
-        self, paper_id:str, paper: pd.Series, collection_key: str, collection_items: Optional[List[Dict]] = None, update_existing=False,
+            self, paper_id:str, paper: pd.Series, collection_key: str, collection_items: Optional[List[Dict]] = None, update_existing=False,
     ) -> str:
         """
         Add a paper item to Zotero.
@@ -1069,23 +1065,30 @@ class PaperLibrary:
         Returns:
             dict: Full-text content and metadata with hierarchical structure.
         """
-        attachments = self.get_attachment_info(item_key).get("attachments")
 
-        if not attachments:
-            raise Exception("No attachments found for item.")
-
-        # Get first attachment that is a PDF
-        pdf_attachments = [
-            x for x in attachments if x.get("contentType") == "application/pdf"
-        ]
-
-        if not pdf_attachments:
-            raise Exception("No PDF attachments found for item.")
-
-        target_attachment = pdf_attachments[0]
-        attachment_key = target_attachment["key"]
-
+        result = {
+            "content": md_text,
+            "indexedPages": None,  # PyMuPDF4LLM processes all pages
+            "totalPages": None,    # Can extract if needed
+        }
         try:
+            attachments = self.get_attachment_info(item_key).get("attachments")
+
+            if not attachments:
+                raise Exception("No attachments found for item.")
+
+            # Get first attachment that is a PDF
+            pdf_attachments = [
+                x for x in attachments if x.get("contentType") == "application/pdf"
+            ]
+
+            if not pdf_attachments:
+                raise Exception("No PDF attachments found for item.")
+
+            target_attachment = pdf_attachments[0]
+            attachment_key = target_attachment["key"]
+
+
             # Download PDF content
             pdf_content = self.zotero_client.get_file(attachment_key)
 
@@ -1100,16 +1103,12 @@ class PaperLibrary:
             # Clean up temp file
             os.remove(temp_path)
 
-            return {
-                "content": md_text,
-                "indexedPages": None,  # PyMuPDF4LLM processes all pages
-                "totalPages": None,    # Can extract if needed
-            }
+            result["content"] = md_text
+            return result
 
         except Exception as e:
-            raise Exception(
-                f"Valid attachment with key {attachment_key} was found, but parsing failed: {str(e)}"
-            )
+            logger.error(f"Could not retrieve full-text for item {item_key}: {e}")
+            return result
 
     def retrieve_pdf_from_zotero_item(self, item_key: str) -> bytes:
         """
