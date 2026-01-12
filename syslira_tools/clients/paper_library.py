@@ -1033,26 +1033,36 @@ class PaperLibrary:
         Returns:
             dict: Full-text content and metadata.
         """
-        attachments = self.get_attachment_info(item_key).get("attachments")
+        result = {
+            "content": "",
+            "indexedPages": None,
+            "totalPages": None,
+        }
+        try:
+            attachments = self.get_attachment_info(item_key).get("attachments")
 
-        if attachments:
-            # Get first attachment that is a PDF
-            pdf_attachments = [
-                x for x in attachments if x.get("contentType") == "application/pdf"
-            ]
+            if attachments:
+                # Get first attachment that is a PDF
+                pdf_attachments = [
+                    x for x in attachments if x.get("contentType") == "application/pdf"
+                ]
 
-            if not pdf_attachments:
-                raise Exception("No PDF attachments found for item.")
+                if not pdf_attachments:
+                    raise Exception(f"No paper attachments found for {item_key}")
 
-            target_attachment = pdf_attachments[0]
-            try:
-                return self.zotero_client.get_fulltext(target_attachment["key"])
-            except Exception:
-                raise Exception(
-                    f"Valid attachment with key {target_attachment['key']} was found, but no fulltext could be retrieved. A potential workaround is to re-retrieve the fulltext through the Zotero client UI."
-                )
-        else:
-            raise Exception("No attachments found for item.")
+
+                target_attachment = pdf_attachments[0]
+
+                fulltext = self.zotero_client.get_fulltext(target_attachment["key"])
+                result.content = fulltext
+                return result
+            else:
+                raise Exception(f"No attachments found for {item_key}")
+
+        except Exception as e:
+            logger.warning(f"Could not retrieve full-text content for {item_key}: {e}")
+            return result
+
 
     def retrieve_parsed_fulltext_from_zotero_item(self, item_key: str) -> Dict:
         """
@@ -1067,7 +1077,7 @@ class PaperLibrary:
         """
 
         result = {
-            "content": md_text,
+            "content": "",
             "indexedPages": None,  # PyMuPDF4LLM processes all pages
             "totalPages": None,    # Can extract if needed
         }
