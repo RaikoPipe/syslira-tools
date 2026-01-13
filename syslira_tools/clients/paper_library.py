@@ -1,3 +1,5 @@
+import logging
+
 from pandas import notna
 from typing import Any, Dict, List, Optional
 
@@ -11,6 +13,7 @@ from syslira_tools.helpers.conversion import convert_inverted_index
 from loguru import logger
 import pymupdf.layout
 import pymupdf4llm
+from tqdm.asyncio import tqdm
 import os
 
 
@@ -762,7 +765,7 @@ class PaperLibrary:
         added = []
         updated = []
 
-        for item in zotero_items:
+        for item in tqdm(zotero_items, desc="Updating from Zotero", unit="item"):
             # create new item
             item["data"]["zoteroKey"] = item["key"]
             item["data"]["id"] = (
@@ -1118,6 +1121,8 @@ class PaperLibrary:
 
 
             # Parse with PyMuPDF4LLM
+            # suppress logging from pymupdf4llm
+            logging.getLogger("pymupdf4llm").setLevel(logging.ERROR)
             md_text = pymupdf4llm.to_markdown(temp_path, header=False, footer=False)
 
             # Clean up temp file
