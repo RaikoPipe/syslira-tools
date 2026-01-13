@@ -23,6 +23,7 @@ class PaperLibrary:
             zotero_client: ZoteroClient,
             openalex_client: OpenAlexClient,  # Add OpenAlex client
             collection_key: str = None,
+            local_storage_path: str = None,
     ):
         """
         Initialize the paper library manager.
@@ -40,6 +41,7 @@ class PaperLibrary:
         self.papers_df = pd.DataFrame(columns=self.columns, dtype=str)
         self.papers_df.set_index("id", inplace=True)
         self.collection_key = collection_key
+        self.local_storage_path = local_storage_path
 
     def get_library_df(self):
         """Return the paper library pandas dataframe"""
@@ -1093,19 +1095,27 @@ class PaperLibrary:
             ]
 
             if not pdf_attachments:
-                raise Exception("No PDF attachments found for item.")
+                raise Exception("No PDF attachments found for item." + item_key)
 
             target_attachment = pdf_attachments[0]
             attachment_key = target_attachment["key"]
 
+            if self.local_storage_path:
+                folder_path = os.path.join(self.local_storage_path, f"{attachment_key}")
+                # get first pdf file in folder
+                pdf_files = [f for f in os.listdir(folder_path) if f.endswith('.pdf')]
+                if not pdf_files:
+                    raise Exception(f"No PDF files found in local storage for attachment {attachment_key}")
+                temp_path = os.path.join(folder_path, pdf_files[0])
+            else:
+                # Download PDF content
+                pdf_content = self.zotero_client.get_file(attachment_key)
 
-            # Download PDF content
-            pdf_content = self.zotero_client.get_file(attachment_key)
+                # Save temporarily
+                temp_path = f"/tmp/{attachment_key}.pdf"
+                with open(temp_path, 'wb') as f:
+                    f.write(pdf_content)
 
-            # Save temporarily
-            temp_path = f"/tmp/{attachment_key}.pdf"
-            with open(temp_path, 'wb') as f:
-                f.write(pdf_content)
 
             # Parse with PyMuPDF4LLM
             md_text = pymupdf4llm.to_markdown(temp_path, header=False, footer=False)
