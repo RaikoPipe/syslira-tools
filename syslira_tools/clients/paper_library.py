@@ -1,3 +1,6 @@
+import contextlib
+import io
+import json
 import logging
 
 from pandas import notna
@@ -1103,6 +1106,13 @@ class PaperLibrary:
             target_attachment = pdf_attachments[0]
             attachment_key = target_attachment["key"]
 
+            # Check cache first
+            cache_path = f"cache/{item_key}_fulltext.json"
+            if os.path.exists(cache_path):
+                with open(cache_path, "r") as f:
+                    cached_result = json.load(f)
+                return cached_result
+
             if self.local_storage_path:
                 folder_path = os.path.join(self.local_storage_path, f"{attachment_key}")
                 # get first pdf file in folder
@@ -1121,14 +1131,20 @@ class PaperLibrary:
 
 
             # Parse with PyMuPDF4LLM
-            # suppress logging from pymupdf4llm
-            logging.getLogger("pymupdf4llm").setLevel(logging.ERROR)
-            md_text = pymupdf4llm.to_markdown(temp_path, header=False, footer=False)
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()): # disable weirdly persistent print output
+                md_text = pymupdf4llm.to_markdown(temp_path, header=False, footer=False)
+
 
             # Clean up temp file
-            os.remove(temp_path)
+            if not self.local_storage_path:
+                os.remove(temp_path)
 
             result["content"] = md_text
+            # save result in cache
+            # make directory cache in working dir if not exists
+            os.mkdir("cache") if not os.path.exists("cache") else None
+            with open(f"cache/{item_key}_fulltext.json", "w") as f:
+                json.dump(result, f)
             return result
 
         except Exception as e:
